@@ -121,7 +121,7 @@ to zombies-move
   ]  
 
   ; code for moving to the middle
-  if (stage = 6) and (count(zombies-here) = 75) [
+  if (stage = 6) and ticks > 8 [
     set stage 61
     facexy 0 10
   ]
