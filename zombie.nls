@@ -1,0 +1,239 @@
+zombies-own [
+  
+  moved
+  stage
+  constant-random-heading
+  
+  startx
+  starty
+  startheading
+]
+
+
+
+to setup-zombie
+  
+  set color red  
+  hide-turtle
+  set stage 0
+  
+end
+
+
+
+to zombies-move
+    
+; planned procedure:
+; 1. make the turtles gather at the x axis
+; 2. make the the two groups meet and form one big group
+; 3. make the big group go hunting
+
+
+; stage 0:  is: random position                             to do: determine position and assign correct stage
+; stage 1:  is: position where x and y > 1                  to do: walk towards the diagonale
+; stage 2:  is: on the diagonale facing the origin          to do: walk towards the gathering point
+; stage 3:  is: at the gathering point facing the axis      to do: walk towards the axis
+; stage 4:  is: at the xaxisgatheringspot facing the origin to do: 
+
+; stage 61: is: pre-stage for stage 62
+; stage 62: is: random movements in group                      
+
+; stage 7:  is: debugging
+; stage 8:  is: corner cases
+; stage 81: is: on the positive x-axis facing the origin    to do: walk towards the xaxisgatheringspot
+
+
+; problems: start in the origin
+
+  ; debugging: store start values
+  if ticks = 0 [
+    set startx [pxcor] of patch-here
+    set starty [pycor] of patch-here
+    set startheading heading
+  ]
+  
+  ; create randomness in a constant to enable the group to walk in the same "random" direction
+  random-seed ticks
+  set constant-random-heading random 361
+  
+  ; important to get consistent results, if you want to know why, comment it out
+  move-to patch-here
+    
+  ; cornercase starting in 0
+  if [pxcor] of patch-here = 0 and [pycor] of patch-here = 0 and stage = 0 [
+    facexy 1 0
+    set stage 84  
+  ]
+
+  ; cornercase starting on the xaxis
+  if abs [pxcor] of patch-here >= 1 and [pycor] of patch-here = 0 and stage = 0 [
+    facexy 0 0
+    set stage 81   
+  ]
+  
+  ; cornercase starting on the yaxis
+  if [pxcor] of patch-here = 0 and abs [pycor] of patch-here > 1 and stage = 0 [
+    facexy 0 0
+    set stage 82
+  ]
+  
+  ; still cornercase yaxis following the path
+  if [pxcor] of patch-here = 0 and abs [pycor] of patch-here = 1 and (stage = 0 or stage = 82) [
+    set heading 0
+    
+    ; determine a random direction
+    if-else random 2 = 1 [
+      rt 90
+    ][
+      rt -90
+    ]
+    set stage 83
+  ]
+  
+  ; if the turtle is not on the diagonale, make it face to the diagonale
+  if abs [pxcor] of patch-here != abs [pycor] of patch-here and abs [pxcor] of patch-here >= 1 and abs [pycor] of patch-here >= 1 and stage = 0 [
+    move-to-diagonale
+    set stage 1
+  ]
+  
+  ; if the turtle is at the diagonale either because it spawned there or because it walked there, make it face the center 
+  if abs [pxcor] of patch-here = abs [pycor] of patch-here and stage <= 1 [
+    facexy 0 0
+    set stage 2
+  ]
+  
+  ; if turtle is at the gathering spot, make it move to the x axis
+  if abs [pxcor] of patch-here = 1 and abs [pycor] of patch-here = 1 and (stage = 2 or stage = 83) [
+    facexy [pxcor] of patch-here 0
+    set stage 3
+  ]
+  
+  ; if turtle is at the xaxisgatheringspot, either because it spawned there or because it walked there, make face the center
+  if abs [pxcor] of patch-here = 1 and abs [pycor] of patch-here = 0 and ( stage <= 3 or stage = 81 or stage = 84 ) [
+    facexy 0 0
+    set stage 4
+  ]
+  
+  ; code for moving to the middle
+  if (stage = 4) and (count(zombies-here) with [moved > 0] = 0) and ticks > 7 [
+    rt 0
+    set stage 6
+  ]  
+
+  ; code for moving to the middle
+  if (stage = 6) and (count(zombies-here) = 75) [
+    set stage 61
+    facexy 0 10
+  ]
+
+  ; go hunting
+  if (stage = 61) and (count(zombies-here) with [moved > 0] = 0) [
+   set heading constant-random-heading 
+   set stage 62
+  ]
+  
+  ; breezing through the stages ;)
+  if (stage = 62) and (count(zombies-here) with [moved > 0] = 0) and ticks > 9 [
+  set stage 63
+  ]
+  
+  ; annother stage
+  if (stage = 63) [
+  set heading constant-random-heading
+  ]
+
+
+  ; one and only movement happens here to make sure we only move once per term
+  if ( stage = 1 or stage = 2 or stage = 3 or stage = 6 or stage = 61 or stage = 63 or stage = 81 or stage = 82 or stage = 83 or stage = 84 ) and moved = 0 [
+    
+    ; walk one step
+    fd 1
+    
+    ; commit suicide so we don't break the rules
+    if [count(zombies-here)] of patch-here > 75 [die]
+    
+    ; to avoid any displacement move to the center of the patch again, maybe not necessary. should this trigger too much movement, kill it.
+    move-to patch-here
+    
+    ; set the moved variable to one for the master control program
+    set moved  1
+  ]
+  ;#3zombies-move
+      
+end
+
+
+
+to move-to-diagonale
+  ; find the quadrant of the turtle
+  let quadrant 0
+
+  ; diagonale lenght = s * sqrt(2)
+; https://de.wikipedia.org/wiki/Oktant_(Geometrie)#Oktanten_im_zweidimensionalen_Raum
+; Quadrant 1: Betrag(x) > Betrag(y) and x und y sind positiv
+; Quadrant 2: Betrag(x) < Betrag(y) and x und y sind positiv
+; Quadrant 3: Betrag(x) < Betrag(y) and x ist negativ y ist positiv
+; Quadrant 4: Betrag(x) > Betrag(y) and x ist negativ y ist positiv
+; Quadrant 5: Betrag(x) > Betrag(y) and x ist negativ y ist negativ
+; Quadrant 6: Betrag(x) < Betrag(y) and x ist negativ y ist negativ
+; Quadrant 7: Betrag(x) < Betrag(y) and x ist positiv y ist negativ
+; Quadrant 8: Betrag(x) > Betrag(y) and x ist positiv y ist negativ
+
+  if abs [pxcor] of patch-here > abs [pycor] of patch-here and [pxcor] of patch-here > 0 and [pycor] of patch-here > 0 [
+    set quadrant 1
+  ]
+
+  if abs [pxcor] of patch-here < abs [pycor] of patch-here and [pxcor] of patch-here > 0 and [pycor] of patch-here > 0 [
+    set quadrant 2
+  ]
+
+  if abs [pxcor] of patch-here < abs [pycor] of patch-here and [pxcor] of patch-here < 0 and [pycor] of patch-here > 0 [
+    set quadrant 3
+  ]
+
+  if abs [pxcor] of patch-here > abs [pycor] of patch-here and [pxcor] of patch-here < 0 and [pycor] of patch-here > 0 [
+    set quadrant 4
+  ]
+
+  if abs [pxcor] of patch-here > abs [pycor] of patch-here and [pxcor] of patch-here < 0 and [pycor] of patch-here < 0 [
+    set quadrant 5
+  ]
+
+  if abs [pxcor] of patch-here < abs [pycor] of patch-here and [pxcor] of patch-here < 0 and [pycor] of patch-here < 0 [
+    set quadrant 6
+  ]
+
+  if abs [pxcor] of patch-here < abs [pycor] of patch-here and [pxcor] of patch-here > 0 and [pycor] of patch-here < 0 [
+    set quadrant 7
+  ]
+
+  if abs [pxcor] of patch-here > abs [pycor] of patch-here and [pxcor] of patch-here > 0 and [pycor] of patch-here < 0 [
+    set quadrant 8
+  ]
+
+  ; move to the correct diagonale; here first choice, do we want to move to the axis or to the boarder of the map?????
+  if quadrant = 1 [
+    facexy [pycor] of patch-here [pycor] of patch-here
+  ]
+  if quadrant = 2 [
+    facexy [pxcor] of patch-here [pxcor] of patch-here
+  ]
+  if quadrant = 3 [
+    facexy [pxcor] of patch-here [pxcor] of patch-here * -1
+  ]
+  if quadrant = 4 [
+    facexy [pycor] of patch-here * -1 [pycor] of patch-here
+  ]
+  if quadrant = 5 [
+    facexy [pycor] of patch-here [pycor] of patch-here
+  ]
+  if quadrant = 6 [
+    facexy [pxcor] of patch-here [pxcor] of patch-here
+  ]
+  if quadrant = 7 [
+    facexy [pxcor] of patch-here [pxcor] of patch-here * -1
+  ]
+  if quadrant = 8 [
+    facexy [pycor] of patch-here * -1 [pycor] of patch-here
+  ]
+end
